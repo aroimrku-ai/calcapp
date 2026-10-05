@@ -19,13 +19,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Build Debug APK
         working-directory: ./CalcApp
         run: |
-          gradle wrapper --gradle-version 8.2
+          chmod +x ./gradlew || true
+          gradle wrapper --gradle-version 8.2 || true
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
