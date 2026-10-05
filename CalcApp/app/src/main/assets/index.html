@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Калькулятор</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body { font-family:-apple-system,Roboto,sans-serif; background:#0d0d0d; color:#fff;
+         display:flex; flex-direction:column; user-select:none; }
+
+  #calc { display:flex; flex-direction:column; height:100%; }
+  #calc.off { display:none; }
+  #display { flex:1; display:flex; align-items:flex-end; justify-content:flex-end;
+             padding:24px; font-size:48px; word-break:break-all; text-align:right; overflow:hidden; }
+  #pad { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:8px; height:64vh; }
+  button { border:none; border-radius:12px; cursor:pointer; font-size:24px; color:#fff;
+           background:#222; transition:transform .05s, background .1s; }
+  button:active { transform:scale(.95); background:#333; }
+  .op { background:#FF9800; } .op:active { background:#e08600; }
+  .fn { background:#333; }
+  .eq { background:#4CAF50; } .eq:active { background:#388E3C; }
+
+  #gallery { display:none; flex-direction:column; height:100%; }
+  #gallery.on { display:flex; }
+  #galTop { display:flex; align-items:center; gap:8px; padding:10px 12px; background:#1a1a1a; }
+  #galTop h2 { font-size:16px; flex:1; }
+  #galTop button { padding:8px 12px; font-size:16px; background:#333; border-radius:8px; color:#fff; }
+  #addBtn { background:#4CAF50 !important; }
+  #galBody { flex:1; overflow-y:auto; padding:8px; }
+  .empty { text-align:center; color:#555; padding:40px 20px; font-size:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:8px; }
+  .item { position:relative; background:#1a1a1a; border-radius:10px; overflow:hidden;
+          aspect-ratio:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .item img { width:100%; height:100%; object-fit:cover; display:block; }
+  .item .icon { font-size:32px; opacity:.7; color:#fff; font-weight:bold; }
+  .item .name { position:absolute; bottom:0; left:0; right:0;
+                background:linear-gradient(transparent, rgba(0,0,0,.85));
+                color:#fff; font-size:11px; padding:14px 6px 5px;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item .del { position:absolute; top:4px; right:4px; width:24px; height:24px;
+               border-radius:50%; background:rgba(0,0,0,.7); color:#fff;
+               font-size:14px; line-height:24px; text-align:center; cursor:pointer; z-index:2; }
+  .item .del:active { background:#c62828; }
+
+  #viewer { display:none; position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.95);
+            flex-direction:column; }
+  #viewer.on { display:flex; }
+  #viewerTop { display:flex; align-items:center; gap:8px; padding:10px 12px; }
+  #viewerTop .title { flex:1; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #viewerTop button { padding:8px 12px; background:#333; border-radius:8px; font-size:14px; color:#fff; }
+  #viewerBody { flex:1; display:flex; align-items:center; justify-content:center;
+                overflow:auto; padding:8px; }
+  #viewerBody img { max-width:100%; max-height:100%; }
+  #viewerBody iframe { width:100%; height:100%; border:none; background:#fff; border-radius:6px; }
+  #viewerBody .txt { width:100%; height:100%; overflow:auto; padding:12px;
+                     background:#111; color:#ddd; font-family:monospace; font-size:13px;
+                     white-space:pre-wrap; word-break:break-all; }
+
+  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:30;
+           align-items:center; justify-content:center; padding:20px; }
+  #modal.on { display:flex; }
+  .box { background:#1a1a1a; border-radius:16px; padding:20px; width:100%; max-width:360px; }
+  .box h2 { font-size:18px; margin-bottom:12px; }
+  .box label { font-size:14px; color:#aaa; display:block; margin:12px 0 6px; }
+  .box input { width:100%; padding:10px; border-radius:8px; border:none;
+               background:#222; color:#fff; font-size:16px; outline:none; }
+  .box .row { display:flex; gap:8px; margin-top:20px; }
+  .box .row button { flex:1; padding:12px; font-size:16px; color:#fff; }
+  .save { background:#4CAF50; } .cancel { background:#333; }
+  .hint { font-size:12px; color:#666; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div id="calc">
+  <div id="display">0</div>
+  <div id="pad">
+    <button class="fn" data-k="C">C</button>
+    <button class="fn" data-k="DEL">DEL</button>
+    <button class="fn" data-k="%">%</button>
+    <button class="op" data-k="/">/</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button class="op" data-k="*">*</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button class="op" data-k="-">-</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+    <button class="fn" data-k="SET">SET</button>
+    <button data-k="0">0</button>
+    <button data-k=".">.</button>
+    <button class="eq" data-k="=">=</button>
+  </div>
+</div>
+
+<div id="gallery">
+  <div id="galTop">
+    <button id="galBack">Back</button>
+    <h2>Мои файлы</h2>
+    <button id="addBtn">Add</button>
+  </div>
+  <div id="galBody"></div>
+</div>
+
+<div id="viewer">
+  <div id="viewerTop">
+    <button id="viewerClose">Back</button>
+    <div class="title" id="viewerTitle"></div>
+    <button id="viewerDownload">Save</button>
+  </div>
+  <div id="viewerBody"></div>
+</div>
+
+<div id="modal">
+  <div class="box">
+    <h2>Настройки</h2>
+    <label>Код поисковика (DuckDuckGo)</label>
+    <input id="codeSearch" type="text" inputmode="numeric" placeholder="например 7777">
+    <label>Код хранилища (фото и файлы)</label>
+    <input id="codeVault" type="text" inputmode="numeric" placeholder="например 1234">
+    <div class="hint">Введи код в калькуляторе и нажми =</div>
+    <div class="row">
+      <button class="cancel" id="cancelBtn">Отмена</button>
+      <button class="save" id="saveBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="filePicker" multiple style="display:none">
+
+<script>
+(function () {
+  let current = "0", previous = null, operation = null, justEvaluated = false;
+
+  const displayEl    = document.getElementById('display');
+  const calcEl       = document.getElementById('calc');
+  const galleryEl    = document.getElementById('gallery');
+  const viewerEl     = document.getElementById('viewer');
+  const modalEl      = document.getElementById('modal');
+  const codeSearchEl = document.getElementById('codeSearch');
+  const codeVaultEl  = document.getElementById('codeVault');
+  const filePicker   = document.getElementById('filePicker');
+  const galBody      = document.getElementById('galBody');
+
+  let cfg = loadCfg();
+  function loadCfg() {
+    try { return Object.assign({ search:"", vault:"" },
+      JSON.parse(localStorage.getItem('calc_cfg') || '{}')); }
+    catch (e) { return { search:"", vault:"" }; }
+  }
+  function saveCfg() { localStorage.setItem('calc_cfg', JSON.stringify(cfg)); }
+
+  function render() { displayEl.textContent = current; }
+  function reset() { current="0"; previous=null; operation=null; justEvaluated=false; render(); }
+
+  function evaluate() {
+    if (operation === null || previous === null) return;
+    const a = previous, b = parseFloat(current);
+    let r = 0;
+    switch (operation) {
+      case '+': r = a + b; break;
+      case '-': r = a - b; break;
+      case '*': r = a * b; break;
+      case '/': r = (b === 0) ? 'Error' : a / b; break;
+    }
+    current = String(r); previous = null; operation = null; justEvaluated = true; render();
+  }
+
+  function openSearch() {
+    if (window.Android && window.Android.openSearch) {
+      window.Android.openSearch();
+    }
+  }
+
+  function press(key) {
+    if (key === '=') {
+      if (cfg.search && current === cfg.search) { reset(); openSearch(); return; }
+      if (cfg.vault  && current === cfg.vault ) { reset(); openGallery(); return; }
+      evaluate(); return;
+    }
+    if (key === 'C') { reset(); return; }
+    if (key === 'DEL') {
+      if (justEvaluated) { reset(); return; }
+      current = current.length > 1 ? current.slice(0,-1) : "0";
+      if (current === "" || current === "-") current = "0";
+      render(); return;
+    }
+    if (key === 'SET') { openSettings(); return; }
+    if (['+','-','*','/'].includes(key)) {
+      if (operation && !justEvaluated) evaluate();
+      previous = parseFloat(current); operation = key;
+      current = "0"; justEvaluated = false; return;
+    }
+    if (key === '%') { current = String(parseFloat(current)/100); render(); return; }
+    if (justEvaluated) { current = "0"; justEvaluated = false; }
+    if (key === '.') { if (!current.includes('.')) current += '.'; render(); return; }
+    if (current === "0") current = key; else current += key;
+    render();
+  }
+
+  document.getElementById('pad').addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const k = btn.dataset.k; if (k) press(k);
+    if (navigator.vibrate) navigator.vibrate(10);
+  });
+
+  function openSettings() {
+    codeSearchEl.value = cfg.search; codeVaultEl.value = cfg.vault;
+    modalEl.classList.add('on');
+  }
+  function closeSettings() { modalEl.classList.remove('on'); }
+
+  document.getElementById('saveBtn').addEventListener('click', () => {
+    cfg.search = codeSearchEl.value.trim(); cfg.vault = codeVaultEl.value.trim();
+    saveCfg(); closeSettings();
+  });
+  document.getElementById('cancelBtn').addEventListener('click', closeSettings);
+
+  // ====== РАБОТА С ФАЙЛАМИ (через Android-мост) ======
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const s = reader.result;
+        resolve(s.substring(s.indexOf(",") + 1));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function vaultAdd(file) {
+    if (!window.Android || !window.Android.saveFile) {
+      throw new Error("Android bridge не найден");
+    }
+    const base64 = await fileToBase64(file);
+    const key = window.Android.saveFile(
+      file.name,
+      file.type || "application/octet-stream",
+      base64
+    );
+    if (key.startsWith("ERROR:")) throw new Error(key);
+    return key;
+  }
+
+  function vaultList() {
+    if (!window.Android || !window.Android.listFiles) return [];
+    try { return JSON.parse(window.Android.listFiles()); }
+    catch (e) { return []; }
+  }
+
+  function vaultRead(key) {
+    if (!window.Android || !window.Android.readFile) return null;
+    const b = window.Android.readFile(key);
+    if (b.startsWith("ERROR:")) return null;
+    return b;
+  }
+
+  function vaultDelete(key) {
+    if (window.Android && window.Android.deleteFile) {
+      window.Android.deleteFile(key);
+    }
+  }
+
+  // ====== ГАЛЕРЕЯ ======
+
+  function openGallery() {
+    calcEl.classList.add('off');
+    galleryEl.classList.add('on');
+    renderGallery();
+  }
+  function closeGallery() {
+    galleryEl.classList.remove('on');
+    calcEl.classList.remove('off');
+  }
+
+  function renderGallery() {
+    const files = vaultList().sort((a,b) => b.added - a.added);
+
+    if (files.length === 0) {
+      galBody.innerHTML = '<div class="empty">Пока пусто. Нажми Add чтобы загрузить фото или файл.</div>';
+      return;
+    }
+
+    const grid = document.createElement('div'); grid.className = 'grid';
+
+    for (const f of files) {
+      const el = document.createElement('div'); el.className = 'item';
+
+      const del = document.createElement('div');
+      del.className = 'del'; del.textContent = 'x';
+      del.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (confirm('Удалить ' + f.name + '?')) {
+          vaultDelete(f.key);
+          renderGallery();
+        }
+      });
+      el.appendChild(del);
+
+      if (f.type.startsWith('image/')) {
+        const b64 = vaultRead(f.key);
+        if (b64) {
+          const img = document.createElement('img');
+          img.src = "data:" + f.type + ";base64," + b64;
+          el.appendChild(img);
+        } else {
+          const icon = document.createElement('div');
+          icon.className = 'icon'; icon.textContent = 'IMG';
+          el.appendChild(icon);
+        }
+      } else {
+        const icon = document.createElement('div');
+        icon.className = 'icon'; icon.textContent = fileIcon(f.type, f.name);
+        el.appendChild(icon);
+      }
+
+      const name = document.createElement('div');
+      name.className = 'name'; name.textContent = f.name;
+      el.appendChild(name);
+
+      el.addEventListener('click', () => openViewer(f.key));
+      grid.appendChild(el);
+    }
+
+    galBody.innerHTML = '';
+    galBody.appendChild(grid);
+  }
+
+  function fileIcon(type, name) {
+    if (type.startsWith('video/')) return 'VID';
+    if (type.startsWith('audio/')) return 'AUD';
+    if (type === 'application/pdf' || /\.pdf$/i.test(name)) return 'PDF';
+    if (type.startsWith('text/') || /\.(txt|md|json|js|css|html|xml|csv|log)$/i.test(name)) return 'TXT';
+    if (/\.(zip|rar|7z|tar|gz)$/i.test(name)) return 'ZIP';
+    if (/\.(doc|docx|odt)$/i.test(name)) return 'DOC';
+    if (/\.(xls|xlsx|ods)$/i.test(name)) return 'XLS';
+    return 'FILE';
+  }
+
+  let currentViewKey = null;
+
+  function openViewer(key) {
+    const b64 = vaultRead(key);
+    if (!b64) { alert("Не удалось прочитать файл"); return; }
+    currentViewKey = key;
+
+    const files = vaultList();
+    const meta = files.find(f => f.key === key) || { name: "file", type: "" };
+
+    document.getElementById('viewerTitle').textContent = meta.name;
+    const body = document.getElementById('viewerBody');
+    body.innerHTML = '';
+
+    const dataUrl = "data:" + (meta.type || "application/octet-stream") + ";base64," + b64;
+
+    if (meta.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = dataUrl; body.appendChild(img);
+    } else if (meta.type === 'application/pdf') {
+      const iframe = document.createElement('iframe');
+      iframe.src = dataUrl; body.appendChild(iframe);
+    } else if (meta.type.startsWith('video/')) {
+      const v = document.createElement('video');
+      v.src = dataUrl; v.controls = true;
+      v.style.maxWidth = '100%'; v.style.maxHeight = '100%';
+      body.appendChild(v);
+    } else if (meta.type.startsWith('audio/')) {
+      const a = document.createElement('audio');
+      a.src = dataUrl; a.controls = true; a.style.width = '100%';
+      body.appendChild(a);
+    } else if (meta.type.startsWith('text/') ||
+               /\.(txt|md|json|js|css|html|xml|csv|log)$/i.test(meta.name)) {
+      const txt = atob(b64);
+      const pre = document.createElement('div');
+      pre.className = 'txt'; pre.textContent = txt;
+      body.appendChild(pre);
+    } else {
+      const a = document.createElement('a');
+      a.href = dataUrl; a.download = meta.name;
+      a.textContent = "Скачать " + meta.name;
+      a.style.color = "#4CAF50"; a.style.fontSize = "18px";
+      body.appendChild(a);
+    }
+
+    viewerEl.classList.add('on');
+  }
+
+  function closeViewer() {
+    viewerEl.classList.remove('on');
+    document.getElementById('viewerBody').innerHTML = '';
+    currentViewKey = null;
+  }
+
+  document.getElementById('viewerClose').addEventListener('click', closeViewer);
+
+  document.getElementById('viewerDownload').addEventListener('click', () => {
+    if (!currentViewKey) return;
+    const b64 = vaultRead(currentViewKey);
+    if (!b64) return;
+    const files = vaultList();
+    const meta = files.find(f => f.key === currentViewKey) || { name: "file", type: "" };
+    const a = document.createElement('a');
+    a.href = "data:" + (meta.type || "application/octet-stream") + ";base64," + b64;
+    a.download = meta.name;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  document.getElementById('addBtn').addEventListener('click', () => filePicker.click());
+  document.getElementById('galBack').addEventListener('click', closeGallery);
+
+  filePicker.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      try { await vaultAdd(f); }
+      catch (err) { alert('Ошибка: ' + err.message); }
+    }
+    filePicker.value = '';
+    renderGallery();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (modalEl.classList.contains('on')) return;
+    if (galleryEl.classList.contains('on')) return;
+    if (viewerEl.classList.contains('on')) { if (e.key === 'Escape') closeViewer(); return; }
+    const k = e.key;
+    if (/^[0-9.]$/.test(k)) press(k);
+    else if (k === '+' || k === '-' || k === '*' || k === '/') press(k);
+    else if (k === 'Enter' || k === '=') press('=');
+    else if (k === 'Backspace') press('DEL');
+    else if (k === 'Escape' || k.toLowerCase() === 'c') press('C');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
