@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Заметки</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; }
+  body {
+    font-family:-apple-system,Roboto,sans-serif; background:#0d0d0d; color:#fff;
+    display:flex; flex-direction:column;
+  }
+
+  #top { display:flex; align-items:center; gap:8px; padding:10px 12px; background:#1a1a1a; }
+  #top h2 { font-size:16px; flex:1; }
+  #top button {
+    padding:8px 12px; background:#4CAF50; color:#fff;
+    border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer;
+  }
+
+  #list { flex:1; overflow-y:auto; padding:8px; }
+  .empty { text-align:center; color:#555; padding:40px 20px; font-size:14px; }
+
+  .note {
+    background:#1a1a1a; border-radius:10px; padding:12px; margin-bottom:8px;
+    cursor:pointer; position:relative; border-left:3px solid #4CAF50;
+  }
+  .note:active { background:#252525; }
+  .note .title { font-size:15px; font-weight:bold; margin-bottom:4px;
+                 white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .note .preview { font-size:13px; color:#999;
+                   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .note .date { font-size:11px; color:#555; margin-top:4px; }
+  .note .del { position:absolute; top:8px; right:8px;
+               width:24px; height:24px; border-radius:50%;
+               background:rgba(0,0,0,0.5); color:#fff;
+               font-size:14px; line-height:24px; text-align:center; cursor:pointer; }
+  .note .del:active { background:#c62828; }
+
+  #editor { display:none; position:fixed; inset:0; z-index:20;
+            background:#0d0d0d; flex-direction:column; }
+  #editor.on { display:flex; }
+
+  #editTop { display:flex; align-items:center; gap:8px; padding:10px 12px; background:#1a1a1a; }
+  #editTop button { padding:8px 12px; background:#333; color:#fff;
+                    border:none; border-radius:8px; font-size:14px; cursor:pointer; }
+  #editTop button.save { background:#4CAF50; font-weight:bold; }
+  #editTop input { flex:1; padding:8px 10px; border-radius:8px; border:none;
+                   background:#222; color:#fff; font-size:15px; outline:none; }
+
+  #editBody { flex:1; padding:12px; display:flex; flex-direction:column; }
+  #editBody textarea {
+    flex:1; width:100%; background:#1a1a1a; color:#fff; border:none;
+    padding:12px; border-radius:10px; font-family:inherit; font-size:15px;
+    resize:none; outline:none; line-height:1.5;
+  }
+
+  #editor .meta { font-size:11px; color:#555; padding:8px 12px; background:#1a1a1a; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h2>Заметки</h2>
+  <button id="addBtn">+ Новая</button>
+</div>
+
+<div id="list"></div>
+
+<div id="editor">
+  <div id="editTop">
+    <button id="backBtn">Назад</button>
+    <input id="titleIn" type="text" placeholder="Заголовок">
+    <button id="saveBtn" class="save">Сохранить</button>
+  </div>
+  <div id="editBody">
+    <textarea id="textIn" placeholder="Текст заметки..."></textarea>
+  </div>
+  <div class="meta" id="metaInfo"></div>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'notes_data';
+  const listEl   = document.getElementById('list');
+  const editorEl = document.getElementById('editor');
+  const titleIn  = document.getElementById('titleIn');
+  const textIn   = document.getElementById('textIn');
+  const metaInfo = document.getElementById('metaInfo');
+
+  let notes = load();
+  let editingId = null;
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
+  function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function fmtDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString().slice(0, 5);
+  }
+
+  function render() {
+    notes.sort((a, b) => b.updated - a.updated);
+    if (notes.length === 0) {
+      listEl.innerHTML = '<div class="empty">Пока пусто. Нажми «+ Новая», чтобы создать заметку.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    for (const n of notes) {
+      const el = document.createElement('div');
+      el.className = 'note';
+
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = n.title || 'Без названия';
+
+      const preview = document.createElement('div');
+      preview.className = 'preview';
+      preview.textContent = (n.text || '').slice(0, 80) || '(пусто)';
+
+      const date = document.createElement('div');
+      date.className = 'date';
+      date.textContent = fmtDate(n.updated);
+
+      const del = document.createElement('div');
+      del.className = 'del'; del.textContent = 'x';
+      del.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (confirm('Удалить заметку?')) {
+          notes = notes.filter(x => x.id !== n.id);
+          save(); render();
+        }
+      });
+
+      el.appendChild(del);
+      el.appendChild(title);
+      el.appendChild(preview);
+      el.appendChild(date);
+      el.addEventListener('click', () => openEditor(n.id));
+      listEl.appendChild(el);
+    }
+  }
+
+  function openEditor(id) {
+    editingId = id;
+    const n = notes.find(x => x.id === id);
+    if (n) {
+      titleIn.value = n.title || '';
+      textIn.value  = n.text  || '';
+      metaInfo.textContent = 'Создано: ' + fmtDate(n.created) +
+                            ' · Изменено: ' + fmtDate(n.updated);
+    } else {
+      titleIn.value = '';
+      textIn.value  = '';
+      metaInfo.textContent = 'Новая заметка';
+    }
+    editorEl.classList.add('on');
+    setTimeout(() => titleIn.focus(), 100);
+  }
+
+  function closeEditor() {
+    editorEl.classList.remove('on');
+    editingId = null;
+  }
+
+  function saveNote() {
+    const title = titleIn.value.trim();
+    const text  = textIn.value.trim();
+    if (!title && !text) { closeEditor(); return; }
+
+    const now = Date.now();
+    if (editingId) {
+      const n = notes.find(x => x.id === editingId);
+      if (n) { n.title = title; n.text = text; n.updated = now; }
+    } else {
+      notes.push({ id: uid(), title, text, created: now, updated: now });
+    }
+    save(); render(); closeEditor();
+  }
+
+  document.getElementById('addBtn').addEventListener('click', () => openEditor(null));
+  document.getElementById('saveBtn').addEventListener('click', saveNote);
+  document.getElementById('backBtn').addEventListener('click', closeEditor);
+
+  render();
+})();
+</script>
+</body>
+</html>
